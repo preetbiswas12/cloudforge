@@ -1,0 +1,106 @@
+import http from 'node:http';
+import fs from 'node:fs/promises';
+import { env } from './env.js';
+import { logger } from './logger.js';
+import { createApp } from './app.js';
+import { WorkspaceService } from './fs/workspace.js';
+import { Watcher } from './fs/watcher.js';
+import { seedWorkspace } from './fs/seed.js';
+import { GitRepo } from './git/repo.js';
+import { Hub } from './realtime/hub.js';
+import { authorizeUpgrade } from './middleware/auth.js';
+
+async function main(): Promise<void> {
+  await fs.mkdir(env.workspaceDir, { recursive: true });
+
+  const workspace = new WorkspaceService(env.workspaceDir);
+  const repo = new GitRepo(env.workspaceDir);
+  const hub = new Hub();
+
+  // Order matters: seed and restore from the remote *before* the watcher
+  // starts, so a pull is not broadcast as a burst of change events to clients.
+  const { created } = await repo.ensure();
+  if (created) await seedWorkspace(workspace);
+  await repo.pullOnBoot();
+  if (created) await repo.commit('chore: initialise workspace', { allowEmpty: true });
+
+  const watcher = new Watcher(env.workspaceDir, hub);
+  await watcher.start();
+
+  const app = createApp({ workspace, repo, hub });
+  const server = http.createServer(app);
+
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
+
+  hub.attach(server, '/ws', authorizeUpgrade);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(env.port, '0.0.0.0', () => {
+      server.removeListener('error', reject);
+      resolve();
+    });
+  });
+
+  logger.info(
+    {
+      port: env.port,
+      workspace: env.workspaceDir,
+      authRequired: Boolean(env.editorToken),
+      env: env.nodeEnv,
+    },
+    'CloudForge is online',
+  );
+
+  // Periodically snapshot the workspace so a redeploy never loses work.
+  let snapshotTimer: NodeJS.Timeout | null = null;
+  if (env.git.enabled && env.git.autoCommit) {
+    snapshotTimer = setInterval(() => {
+      void (async () => {
+        if (!(await repo.hasChanges())) return;
+        await repo.snapshot(`chore: autosave ${new Date().toISOString()}`);
+      })();
+    }, env.git.snapshotIntervalMs);
+    snapshotTimer.unref?.();
+  }
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, 'Shutting down');
+
+    if (snapshotTimer) clearInterval(snapshotTimer);
+
+    // Flush pending work before the process goes away.
+    if (env.git.enabled && (await repo.hasChanges())) {
+      await repo.snapshot('chore: autosave on shutdown');
+    }
+
+    await watcher.close();
+    await hub.close();
+
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      setTimeout(resolve, 8000).unref?.();
+    });
+
+    process.exit(0);
+  };
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => {
+      void shutdown(signal);
+    });
+  }
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ err: reason }, 'Unhandled promise rejection');
+  });
+}
+
+main().catch((error) => {
+  logger.fatal({ err: error }, 'Failed to start CloudForge');
+  process.exit(1);
+});

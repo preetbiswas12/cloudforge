@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Runtime workspace (user files live here)
+workspace/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

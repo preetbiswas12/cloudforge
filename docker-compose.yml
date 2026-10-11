@@ -1,0 +1,21 @@
+services:
+  cloudforge:
+    build: .
+    image: cloudforge:latest
+    ports:
+      - '8080:8080'
+    environment:
+      NODE_ENV: production
+      PORT: '8080'
+      WORKSPACE_DIR: /workspace
+      GIT_ENABLED: 'true'
+      # Put these in a .env file next to this compose file instead of in git.
+      # EDITOR_TOKEN: change-me
+      # GIT_REMOTE: git@github.com:you/workspace.git
+      # GIT_REMOTE_TOKEN: github_pat_xxx
+    volumes:
+      # Real files, persisted on your host.
+      - ./workspace:/workspace
+      # Optional: mount an SSH key if GIT_REMOTE uses the git@github.com form.
+      # - ~/.ssh:/root/.ssh:ro
+    restart: unless-stopped

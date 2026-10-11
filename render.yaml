@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: cloudforge
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+
+    # Persistent disk is essential here: without it, user files are wiped on
+    # every deploy. The disk mounts at /workspace (see Dockerfile ENV).
+    disk:
+      name: cloudforge-workspace
+      mountPath: /workspace
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GIT_ENABLED
+        value: "true"
+      # Set these in the Render dashboard (Dashboard → Environment):
+      # - GIT_REMOTE       e.g. git@github.com:you/workspace.git
+      # - GIT_REMOTE_TOKEN a GitHub token with contents: read+write
+      # - EDITOR_TOKEN     any random string, if you want the editor locked

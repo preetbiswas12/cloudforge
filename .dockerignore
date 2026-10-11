@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+dist
+**/dist
+workspace
+.git
+.github
+.env
+.env.local
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+README.md

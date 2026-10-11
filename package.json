@@ -1,0 +1,26 @@
+{
+  "name": "cloudforge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CloudForge — a self-hostable web code editor powered by Monaco.",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace @cloudforge/server",
+    "dev:web": "npm run dev --workspace @cloudforge/web",
+    "build": "npm run build --workspace @cloudforge/web && npm run build --workspace @cloudforge/server",
+    "start": "npm run start --workspace @cloudforge/server",
+    "typecheck": "npm run typecheck --workspace @cloudforge/server && npm run typecheck --workspace @cloudforge/web",
+    "test": "npm run test --workspace @cloudforge/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
