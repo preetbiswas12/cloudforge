@@ -18,6 +18,7 @@
     "build": "npm run build --workspace @cloudforge/web && npm run build --workspace @cloudforge/server",
     "start": "npm run start --workspace @cloudforge/server",
     "typecheck": "npm run typecheck --workspace @cloudforge/server && npm run typecheck --workspace @cloudforge/web",
+    "verify:deps": "npm run build && node scripts/verify-runtime-deps.mjs",
     "test": "npm run test --workspace @cloudforge/server"
   },
   "devDependencies": {

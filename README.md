@@ -198,7 +198,10 @@ npm run build       # typecheck, bundle the client, compile the server
 npm start           # run the production build
 npm test            # server unit tests (path safety, workspace ops)
 npm run typecheck   # both workspaces
+npm run verify:deps # fail if any runtime import is not a real dependency
 ```
+
+> **Why `verify:deps` exists.** Putting a runtime import in `devDependencies` works perfectly on your machine — devDeps are installed — and then the container runs `npm ci --omit=dev`, strips it, and the server dies with `ERR_MODULE_NOT_FOUND` after the build has already succeeded. The container build never catches it, so the deploy fails at runtime. This check scans the *compiled* server output and fails if anything it imports is missing from `dependencies`.
 
 ---
 
@@ -242,6 +245,7 @@ cloudforge/
 | `Workspace is protected` | `EDITOR_TOKEN` is set — open `/?token=...` |
 | Live sync never connects | Reverse proxy is stripping `Upgrade`/`Connection` headers |
 | Monaco is blank | The client bundle didn't build — check `npm run build` output |
+| `Exited with status 1` / `ERR_MODULE_NOT_FOUND` at startup | A runtime import is in `devDependencies`. Run `npm run verify:deps` |
 | Port already in use | `PORT=3000 npm start`, or stop the other process |
 | `git push` fails | Token lacks `contents: write`, or the repo has diverged (pull is fast-forward only) |
 
