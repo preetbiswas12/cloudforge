@@ -4,6 +4,7 @@ import { FileTree } from './components/FileTree';
 import { QuickOpen } from './components/QuickOpen';
 import { StatusBar } from './components/StatusBar';
 import { Tabs } from './components/Tabs';
+import { TerminalPanel } from './components/Terminal';
 import { useEditor } from './store';
 
 export function App(): JSX.Element {
@@ -14,6 +15,7 @@ export function App(): JSX.Element {
   const bootstrap = useEditor((state) => state.bootstrap);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
 
   useEffect(() => {
     void bootstrap();
@@ -60,6 +62,12 @@ export function App(): JSX.Element {
       if (mod && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void saveAll();
+        return;
+      }
+      // Ctrl+` toggles the terminal, matching VS Code.
+      if (mod && event.key === '`') {
+        event.preventDefault();
+        setTerminalOpen((open) => !open);
       }
     },
     [saveAll, setSidebarVisible],
@@ -85,7 +93,10 @@ export function App(): JSX.Element {
 
   return (
     <div className={`app${sidebarVisible ? '' : ' app--no-sidebar'}`}>
-      <TopBar onToggleSidebar={() => setSidebarVisible(!sidebarVisible)} />
+      <TopBar
+        onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+        onToggleTerminal={() => setTerminalOpen((open) => !open)}
+      />
 
       <div className="app__body">
         {sidebarVisible && <FileTree />}
@@ -95,6 +106,7 @@ export function App(): JSX.Element {
           <div className="workspace__editor">
             <CodeEditor onSave={() => void saveAll()} />
           </div>
+          {terminalOpen && <TerminalPanel onClose={() => setTerminalOpen(false)} />}
         </main>
       </div>
 
@@ -105,7 +117,12 @@ export function App(): JSX.Element {
   );
 }
 
-function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }): JSX.Element {
+interface TopBarProps {
+  onToggleSidebar: () => void;
+  onToggleTerminal: () => void;
+}
+
+function TopBar({ onToggleSidebar, onToggleTerminal }: TopBarProps): JSX.Element {
   const createSnapshot = useEditor((state) => state.createSnapshot);
   const status = useEditor((state) => state.status);
 
@@ -123,6 +140,15 @@ function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }): JSX.Eleme
       </div>
 
       <div className="topbar__spacer" />
+
+      <button
+        type="button"
+        className="btn btn--ghost"
+        onClick={onToggleTerminal}
+        title="Toggle terminal (Ctrl+`)"
+      >
+        ▸_ Terminal
+      </button>
 
       <button type="button" className="btn btn--ghost" onClick={() => void createSnapshot()} title="Commit the current state to git">
         ⎇ Save version

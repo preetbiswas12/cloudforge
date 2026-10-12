@@ -29,6 +29,42 @@ export const env = {
 
   editorToken: (process.env['EDITOR_TOKEN'] ?? '').trim(),
 
+  terminal: {
+    /**
+     * Off by default. Even when enabled, TerminalManager refuses to open a
+     * session unless editorToken is also set — a shell on an open instance is
+     * a remote shell for anyone who finds the URL.
+     */
+    enabled: bool(process.env['TERMINAL_ENABLED'], false),
+    /**
+     * Resolved per-platform. On Linux (Render/Railway/Fly) this is `/bin/sh`.
+     *
+     * On Windows we deliberately use `cmd.exe`, not PowerShell: PowerShell
+     * produces no output when its stdin is a pipe rather than a real console,
+     * which makes it useless for a web terminal without a native PTY.
+     * Override with TERMINAL_SHELL.
+     */
+    shell:
+      (process.env['TERMINAL_SHELL'] ?? '').trim() ||
+      (process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'),
+    /** Extra args, since shells disagree about how to be told "interactive". */
+    shellArgs: process.platform === 'win32' ? ['/Q'] : ['-i'],
+    /**
+     * PATH for the child process. This doubles as the search path Node uses to
+     * resolve the shell binary itself, so it has to contain the directory the
+     * shell actually lives in — PowerShell is not in System32.
+     */
+    shellPath:
+      process.platform === 'win32'
+        ? [
+            process.env['SystemRoot'] ?? 'C:\\Windows',
+            `${process.env['SystemRoot'] ?? 'C:\\Windows'}\\System32`,
+            `${process.env['SystemRoot'] ?? 'C:\\Windows'}\\System32\\WindowsPowerShell\\v1.0`,
+            'C:\\Program Files\\Git\\usr\\bin',
+          ].join(';')
+        : '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+  },
+
   git: {
     enabled: bool(process.env['GIT_ENABLED'], true),
     authorName: process.env['GIT_AUTHOR_NAME'] ?? 'CloudForge',

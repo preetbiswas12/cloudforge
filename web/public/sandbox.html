@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CloudForge sandbox</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        color: #e6e8ee;
+        font-family: ui-monospace, 'JetBrains Mono', Consolas, monospace;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      /**
+       * Sandboxed code runner.
+       *
+       * This document is loaded into an iframe with sandbox="allow-scripts" and
+       * no allow-same-origin, so it runs on an opaque origin with no access to
+       * this app, its cookies, its storage, or the server. The parent talks to
+       * it over postMessage and nothing else.
+       *
+       * Nothing here can reach the CloudForge server: there is no network call
+       * back to our own origin, and the parent only ever reads `output`/`error`
+       * strings out of the replies.
+       */
+
+      /** Serialise anything thrown or logged into readable text. */
+      function inspect(value) {
+        if (typeof value === 'string') return value;
+        if (value instanceof Error) return value.stack || value.message;
+        if (value === undefined) return 'undefined';
+        if (value === null) return 'null';
+        if (typeof value === 'function') return `[Function ${value.name || 'anonymous'}]`;
+        try {
+          return JSON.stringify(
+            value,
+            (key, val) => {
+              if (typeof val === 'bigint') return `${val}n`;
+              if (typeof val === 'function') return `[Function ${val.name || 'anonymous'}]`;
+              if (typeof val === 'symbol') return val.toString();
+              return val;
+            },
+            2,
+          );
+        } catch {
+          return String(value);
+        }
+      }
+
+      /** Build a console that forwards everything to the parent terminal. */
+      function makeConsole(send, level) {
+        const write = (...args) => send({ stream: level, text: args.map(inspect).join(' ') });
+        return { log: write, info: write, warn: write, error: write, debug: write, table: write };
+      }
+
+      // ---- JavaScript / TypeScript -----------------------------------------
+      async function runJavaScript(code, reply) {
+        const logs = [];
+        const capture = (stream) => (...args) => logs.push({ stream, text: args.map(inspect).join(' ') });
+
+        const fakeConsole = {
+          log: capture('log'),
+          info: capture('info'),
+          warn: capture('warn'),
+          error: capture('error'),
+          debug: capture('debug'),
+          table: capture('log'),
+          trace: capture('debug'),
+          group: capture('log'),
+          groupEnd: () => {},
+        };
+
+        // Strip TypeScript-only syntax that browsers cannot parse. This is a
+        // deliberately small transform — it handles annotations and `enum`,
+        // not a full type checker.
+        const runnable = stripTypes(code);
+
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        let value;
+        try {
+          // `new Function` lets us hand the code its own console instead of
+          // letting it write to ours.
+          value = await new AsyncFunction('console', runnable)(fakeConsole);
+        } catch (error) {
+          reply({ ok: false, logs, error: inspect(error) });
+          return;
+        }
+
+        if (value !== undefined) logs.push({ stream: 'log', text: inspect(value) });
+        reply({ ok: true, logs, error: null });
+      }
+
+      /** Remove the type annotations that would otherwise be a syntax error. */
+      function stripTypes(code) {
+        return (
+          code
+            // `import x from 'y'` / `import type {...}` -> removed
+            .replace(/^\s*import\s+[^;]*?;?\s*$/gm, '')
+            .replace(/^\s*export\s+(type|interface)\s+[\s\S]*?^\}/gm, '')
+            .replace(/^\s*export\s+(type|interface)\s+[^;{]*;?\s*$/gm, '')
+            // `type Foo = ...` -> removed
+            .replace(/^\s*(?:export\s+)?type\s+\w+[^;]*=[^;]*;?\s*$/gm, '')
+            // `enum X {}` -> a plain object literal
+            .replace(/^\s*(?:export\s+)?enum\s+(\w+)\s*\{([^}]*)\}/gm, (_, name, body) => {
+              const members = body
+                .split(',')
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .map((part) => `'${part.split('=')[0].trim()}': ${part.includes('=') ? part.split('=').slice(1).join('=').trim() : part.split(':')[0].trim()}`);
+              return `const ${name} = { ${members.join(', ')} };`;
+            })
+            // `as Type` casts
+            .replace(/\s+as\s+const\b/g, '')
+            .replace(/\s+as\s+[A-Za-z_$][\w$<>[\]|,\s.]*(?=[,;)\]}\n])/g, '')
+            // Parameter and return type annotations: `name: Type` / `: Type {`
+            .replace(/([(,]\s*[A-Za-z_$][\w$]*)\s*:\s*[A-Za-z_$][\w$<>[\]|,\s.]*(?=\s*[,)=])/g, '$1')
+            // Generic type arguments on calls: `foo<Bar>(`
+            .replace(/([A-Za-z_$][\w$]*)<[A-Za-z_$][\w$<>,[\]\s|]*>\(/g, '$1(')
+            // Non-null assertions
+            .replace(/!\s*([.,;)\]])/g, '$1')
+        );
+      }
+
+      // ---- Python (Pyodide, in-browser CPython via WebAssembly) -------------
+      async function runPython(code, reply) {
+        let pyodide;
+        try {
+          pyodide = await loadPyodide({
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/',
+          });
+        } catch (error) {
+          reply({
+            ok: false,
+            logs: [],
+            error: `Could not load the Python runtime: ${inspect(error)}\n\nCheck your connection — Pyodide downloads a WebAssembly build of CPython on first use.`,
+          });
+          return;
+        }
+
+        const logs = [];
+        pyodide.setStdout({ batched: (text) => logs.push({ stream: 'log', text: text.replace(/\n$/, '') }) });
+        pyodide.setStderr({ batched: (text) => logs.push({ stream: 'error', text: text.replace(/\n$/, '') }) });
+
+        try {
+          await pyodide.runPythonAsync(code);
+          reply({ ok: true, logs, error: null });
+        } catch (error) {
+          reply({ ok: false, logs, error: inspect(error) });
+        }
+      }
+
+      // ---- Dispatch --------------------------------------------------------
+      window.addEventListener('message', async (event) => {
+        const message = event.data;
+        if (!message || message.type !== 'run') return;
+
+        const { id, language, code } = message;
+        const reply = (payload) =>
+          parent.postMessage({ type: 'result', id, language, ...payload }, '*');
+
+        const startedAt = performance.now();
+        try {
+          if (language === 'python') {
+            await runPython(code, reply);
+          } else {
+            await runJavaScript(code, reply);
+          }
+        } catch (error) {
+          reply({ ok: false, logs: [], error: inspect(error) });
+        }
+        parent.postMessage({ type: 'duration', id, ms: Math.round(performance.now() - startedAt) }, '*');
+      });
+
+      parent.postMessage({ type: 'ready' }, '*');
+    </script>
+  </body>
+</html>

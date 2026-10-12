@@ -10,11 +10,13 @@ import { createFilesRouter } from './routes/files.js';
 import type { WorkspaceService } from './fs/workspace.js';
 import type { GitRepo } from './git/repo.js';
 import type { Hub } from './realtime/hub.js';
+import type { TerminalManager } from './terminal/manager.js';
 
 export function createApp(deps: {
   workspace: WorkspaceService;
   repo: GitRepo;
   hub: Hub;
+  terminal: TerminalManager;
 }): Express {
   const app = express();
 
@@ -33,11 +35,14 @@ export function createApp(deps: {
         "default-src 'self'",
         // Monaco injects styles at runtime and evaluates user code in a worker.
         "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-eval'",
+        // 'wasm-unsafe-eval' is required for Pyodide's WebAssembly CPython,
+        // which the browser-side terminal sandbox loads lazily.
+        "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
         "worker-src 'self' blob:",
         "img-src 'self' data: blob:",
         "font-src 'self' data:",
-        "connect-src 'self' ws: wss:",
+        "connect-src 'self' ws: wss: https://cdn.jsdelivr.net",
+        "frame-src 'self' blob:",
       ].join('; '),
     );
     next();
@@ -65,6 +70,13 @@ export function createApp(deps: {
       requiresToken: Boolean(env.editorToken),
       maxFileBytes: env.maxFileBytes,
     });
+  });
+
+  // Tells the client whether a real server shell can be opened, and why not if
+  // it cannot. Reports capability only — never a command execution surface.
+  app.get('/api/terminal', (_req, res) => {
+    const blocked = deps.terminal.blockedReason;
+    res.json({ enabled: blocked === null, reason: blocked });
   });
 
   app.use('/api', createFilesRouter(deps));

@@ -1091,6 +1091,142 @@ kbd {
 }
 
 /* ===========================================================================
+   Terminal panel
+   =========================================================================== */
+
+.terminal {
+  height: 260px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0a0c11;
+  border-top: 1px solid var(--border-strong);
+  animation: slide-up 0.24s var(--ease);
+  position: relative;
+}
+
+@keyframes slide-up {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: 260px;
+    opacity: 1;
+  }
+}
+
+.terminal__head {
+  height: 34px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 4px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(14, 16, 21, 0.6);
+}
+
+.terminal__tabs {
+  display: flex;
+  height: 100%;
+}
+
+.terminal__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.15s var(--ease),
+    background-color 0.15s var(--ease);
+}
+
+.terminal__tab:hover {
+  color: var(--fg-muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.terminal__tab.is-active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.terminal__warn {
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.terminal__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal__btn {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.terminal__body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 4px 4px 10px;
+  overflow: hidden;
+}
+
+/* xterm renders a canvas-like surface; make it fill the panel. */
+.terminal__body .xterm {
+  height: 100%;
+}
+
+.terminal__body .xterm-viewport {
+  background: transparent !important;
+}
+
+.terminal__blocked,
+.terminal__hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  background: rgba(10, 12, 17, 0.95);
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+  backdrop-filter: blur(6px);
+}
+
+.terminal__blocked strong {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.terminal__hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ===========================================================================
    Responsive
    =========================================================================== */
 

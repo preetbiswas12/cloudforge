@@ -173,7 +173,63 @@ Also recommended: put Cloudflare in front, keep the git repo private, and run on
 
 ---
 
-## 5. Configuration
+## 5. Running code
+
+Press <kbd>Ctrl</kbd> <kbd>`</kbd> for the terminal panel. There are two modes,
+and they have very different risk profiles.
+
+### Browser sandbox — always on, safe
+
+JavaScript, TypeScript and Python run **in your browser**, inside an iframe
+with `sandbox="allow-scripts"` and no `allow-same-origin`. The code gets an
+opaque origin: it cannot read this app, its storage, its cookies, or call our
+API. The server never executes anything.
+
+Python uses [Pyodide](https://pyodide.org) — a WebAssembly build of CPython,
+downloaded from jsDelivr on first run (hence the `cdn.jsdelivr.net` entry in
+the CSP).
+
+This is the default because it costs the server nothing and cannot be abused.
+
+### Server shell — opt-in, genuinely dangerous
+
+Set both variables:
+
+```
+TERMINAL_ENABLED=true
+EDITOR_TOKEN=<a long random string>
+```
+
+That gives **anyone holding the token a shell on your server**: read every
+file, run `npm install`, `node server.js`, fork bombs, scan your private
+network. `EDITOR_TOKEN` is required — the server refuses to start a session
+without it, so you cannot accidentally expose a shell on a public link.
+
+Hardening that ships regardless:
+
+| Control | Limit |
+|---|---|
+| Child environment | Replaced entirely. `EDITOR_TOKEN` and `GIT_REMOTE_TOKEN` are **absent** |
+| Concurrent sessions | 4 |
+| Idle timeout | 30 minutes |
+| Absolute lifetime | 12 hours |
+| Output | Ring-buffered at 512 KB per session |
+| Teardown | Whole process **group** killed, so orphaned grandchildren die too |
+| Input size | Capped at 4 KB per frame |
+| Scoping | Sessions are bound to the owning websocket — one browser cannot drive another's shell |
+
+There is no PTY (a native dependency that would complicate the Docker
+image), so this is a pipe session: `ls`, `npm test`, `node app.js` all work;
+full-screen TUI programs like `vim` and `top` do not.
+
+> Isolating this properly means running it in a container or microVM (gVisor,
+> Firecracker) with no network and a read-only rootfs. That is a larger piece
+> of infrastructure than this app. If you need a real shell, treat the
+> instance as a private single-user box — never share the token.
+
+---
+
+## 6. Configuration
 
 Every value, with defaults, is in [`.env.example`](.env.example). The ones that matter:
 
@@ -182,6 +238,8 @@ Every value, with defaults, is in [`.env.example`](.env.example). The ones that 
 | `PORT` | `8080` | HTTP port (PaaS injects this) |
 | `WORKSPACE_DIR` | `./workspace` | Where user files live — mount a volume here |
 | `EDITOR_TOKEN` | *(empty)* | Set to require a token |
+| `TERMINAL_ENABLED` | `false` | Enable the real server shell (also needs `EDITOR_TOKEN`) |
+| `TERMINAL_SHELL` | `/bin/sh` or `cmd.exe` | Which binary the server shell spawns |
 | `GIT_REMOTE` / `GIT_REMOTE_TOKEN` | *(empty)* | Remote for version history + off-host persistence |
 | `GIT_PULL_ON_BOOT` | `true` | Restore the workspace on restart |
 | `AUTO_COMMIT` / `SNAPSHOT_INTERVAL_MS` | `true` / `300000` | Autosave cadence |
@@ -190,7 +248,7 @@ Every value, with defaults, is in [`.env.example`](.env.example). The ones that 
 
 ---
 
-## 6. Commands
+## 7. Commands
 
 ```bash
 npm run dev         # server + web with hot reload
@@ -205,7 +263,7 @@ npm run verify:deps # fail if any runtime import is not a real dependency
 
 ---
 
-## 7. Project layout
+## 8. Project layout
 
 ```
 cloudforge/
@@ -237,7 +295,7 @@ cloudforge/
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Cause / fix |
 | --- | --- |

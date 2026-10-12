@@ -49,7 +49,7 @@ export interface ServerConfig {
 }
 
 export interface ServerEvent {
-  type: 'hello' | 'peers' | 'fs:changed' | 'toast' | 'pong';
+  type: 'hello' | 'peers' | 'fs:changed' | 'toast' | 'pong' | 'terminal:output' | 'terminal:exit';
   clientId?: string;
   peers?: number;
   path?: string;
@@ -57,4 +57,13 @@ export interface ServerEvent {
   change?: string;
   level?: 'info' | 'error';
   message?: string;
+  sessionId?: string;
+  data?: string;
+  code?: number | null;
+}
+
+/** Terminal capability, as reported by the server. */
+export interface TerminalConfig {
+  enabled: boolean;
+  reason: string | null;
 }

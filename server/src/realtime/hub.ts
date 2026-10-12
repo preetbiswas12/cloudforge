@@ -9,7 +9,16 @@ export type ServerEvent =
   | { type: 'peers'; peers: number }
   | { type: 'fs:changed'; path: string; kind: 'file' | 'dir'; change: string }
   | { type: 'toast'; level: 'info' | 'error'; message: string }
+  | { type: 'terminal:output'; sessionId: string; data: string }
+  | { type: 'terminal:exit'; sessionId: string; code?: number | null }
   | { type: 'pong' };
+
+/** Messages a client may send up the socket. */
+export interface ClientEvent {
+  type: 'ping' | 'terminal:open' | 'terminal:input' | 'terminal:close';
+  data?: string;
+  sessionId?: string;
+}
 
 interface Client {
   id: string;
@@ -25,6 +34,12 @@ export class Hub {
   private readonly clients = new Map<string, Client>();
   private wss: WebSocketServer | null = null;
   private heartbeat: NodeJS.Timeout | null = null;
+  /** Optional hook for handling client->server messages (currently terminal). */
+  private onMessage: ((clientId: string, message: ClientEvent) => void) | null = null;
+
+  setMessageHandler(handler: (clientId: string, message: ClientEvent) => void): void {
+    this.onMessage = handler;
+  }
 
   /** Attach to an existing HTTP server on the given path (no separate port). */
   attach(server: Server, path: string, authorize: (req: IncomingMessage) => boolean): void {
@@ -82,8 +97,12 @@ export class Hub {
     });
     socket.on('message', (raw) => {
       try {
-        const message = JSON.parse(String(raw)) as { type?: string };
-        if (message?.type === 'ping') this.send(id, { type: 'pong' });
+        const message = JSON.parse(String(raw)) as ClientEvent;
+        if (message?.type === 'ping') {
+          this.send(id, { type: 'pong' });
+          return;
+        }
+        this.onMessage?.(id, message);
       } catch {
         // Ignore malformed client frames.
       }
@@ -96,6 +115,17 @@ export class Hub {
       logger.warn({ err: error, id }, 'WebSocket error');
       this.clients.delete(id);
     });
+  }
+
+  /** Send an event to one specific client (used to scope terminal output). */
+  sendTo(clientId: string, event: ServerEvent): void {
+    const client = this.clients.get(clientId);
+    if (!client || client.socket.readyState !== WebSocket.OPEN) return;
+    try {
+      client.socket.send(JSON.stringify(event));
+    } catch {
+      // Dead socket; the close handler cleans it up.
+    }
   }
 
   get peerCount(): number {

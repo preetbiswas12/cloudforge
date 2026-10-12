@@ -1,5 +1,8 @@
 import { authToken } from './api';
 import type { ServerEvent } from './types';
+import type { LogLine } from './run/runner';
+
+export type { LogLine };
 
 type Status = 'connecting' | 'open' | 'closed';
 

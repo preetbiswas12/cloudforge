@@ -1,4 +1,4 @@
-import type { FileContent, Listing, ServerConfig, WorkspaceStatus } from './types';
+import type { FileContent, Listing, ServerConfig, TerminalConfig, WorkspaceStatus } from './types';
 
 const TOKEN_STORAGE_KEY = 'cloudforge.token';
 
@@ -104,6 +104,12 @@ export const api = {
   remove: (path: string) => request<{ path: string }>(`/api/file${query(path)}`, { method: 'DELETE' }),
 
   status: () => request<WorkspaceStatus>('/api/status'),
+
+  /**
+   * Whether a real server shell is available. Never throws — an unreachable
+   * server simply means no terminal.
+   */
+  terminal: () => request<TerminalConfig>('/api/terminal').catch(() => ({ enabled: false, reason: null })),
 
   snapshot: () =>
     request<{ committed: boolean; pushed: boolean }>('/api/snapshot', { method: 'POST' }),
