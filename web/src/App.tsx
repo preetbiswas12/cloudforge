@@ -116,7 +116,9 @@ function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }): JSX.Eleme
       </button>
 
       <div className="topbar__brand">
-        <span className="topbar__logo">◆</span>
+        <span className="topbar__logo" aria-hidden="true">
+          ◆
+        </span>
         <span className="topbar__name">CloudForge</span>
       </div>
 

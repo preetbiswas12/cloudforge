@@ -44,9 +44,12 @@ export function CodeEditor({ onSave }: CodeEditorProps): JSX.Element | null {
     return (
       <div className="editor-empty">
         <div className="editor-empty__inner">
-          <h2>No file open</h2>
+          <div className="editor-empty__mark" aria-hidden="true">
+            {'</>'}
+          </div>
+          <h2>Nothing open</h2>
           <p>
-            Pick a file from the sidebar, or press <kbd>Ctrl</kbd> <kbd>P</kbd> to search by name.
+            Pick a file from the sidebar, or hit <kbd>Ctrl</kbd> <kbd>P</kbd> to jump straight to one.
           </p>
         </div>
       </div>
@@ -57,9 +60,12 @@ export function CodeEditor({ onSave }: CodeEditorProps): JSX.Element | null {
     return (
       <div className="editor-empty">
         <div className="editor-empty__inner">
+          <div className="editor-empty__mark" aria-hidden="true">
+            ⚑
+          </div>
           <h2>Binary file</h2>
           <p>
-            <code>{active}</code> is not text and cannot be edited here.
+            <code>{active}</code> holds non-text data, so there is nothing to edit here.
           </p>
         </div>
       </div>

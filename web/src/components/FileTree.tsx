@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useEditor } from '../store';
+import { FOLDER_COLOR, fileIcon, folderIcon } from '../icons';
 import type { FsEntry } from '../types';
 
 interface MenuState {
@@ -294,9 +295,7 @@ function TreeNode({ entry, depth, parent }: { entry: FsEntry; depth: number; par
           title={entry.path}
         >
           <span className={`tree-caret${expanded ? ' tree-caret--open' : ''}`} aria-hidden="true" />
-          <span className="tree-icon" aria-hidden="true">
-            {expanded ? '📂' : '📁'}
-          </span>
+          <DirIcon open={expanded} />
           <span className="tree-name">{entry.name}</span>
         </button>
 
@@ -315,9 +314,7 @@ function TreeNode({ entry, depth, parent }: { entry: FsEntry; depth: number; par
       title={entry.path}
     >
       <span className="tree-caret" aria-hidden="true" />
-      <span className="tree-icon" aria-hidden="true">
-        {iconFor(entry.name)}
-      </span>
+      <FileIcon name={entry.name} />
       <span className="tree-name">{entry.name}</span>
     </button>
   );
@@ -369,30 +366,21 @@ function join(parent: string, name: string): string {
   return parent ? `${parent}/${name}` : name;
 }
 
-function iconFor(name: string): string {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-      return '🟦';
-    case 'js':
-    case 'jsx':
-      return '🟨';
-    case 'json':
-      return '🟩';
-    case 'css':
-    case 'scss':
-      return '🟪';
-    case 'html':
-      return '🟧';
-    case 'md':
-      return '📘';
-    case 'py':
-      return '🐍';
-    case 'yml':
-    case 'yaml':
-      return '🐳';
-    default:
-      return '📄';
-  }
+/** Inline SVG markup, coloured per file type. */
+function FileIcon({ name }: { name: string }): JSX.Element {
+  const { markup, color } = fileIcon(name);
+  return (
+    <span className="tree-icon" style={{ color }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />
+  );
+}
+
+function DirIcon({ open }: { open: boolean }): JSX.Element {
+  return (
+    <span
+      className="tree-icon"
+      style={{ color: FOLDER_COLOR }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: folderIcon(open) }}
+    />
+  );
 }
